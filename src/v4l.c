@@ -62,6 +62,9 @@ so, delete this exception statement from your version.
 #endif
 #endif
 
+#include <libv4l2.h>
+
+
 char *v4l_guess(char *str, int *fd);
 void v4l_key_command(rfbBool down, rfbKeySym keysym, rfbClientPtr client);
 void v4l_pointer_command(int mask, int x, int y, rfbClientPtr client);
@@ -182,7 +185,7 @@ static int v4l1_resize(int fd, int w, int h) {
 	int dowin = 0;
 
 	memset(&v4l1_window, 0, sizeof(v4l1_window));
-	if (ioctl(fd, VIDIOCGWIN, &v4l1_window) == -1) {
+	if (v4l2_ioctl(fd, VIDIOCGWIN, &v4l1_window) == -1) {
 		return 0;
 	}
 
@@ -201,13 +204,13 @@ static int v4l1_resize(int fd, int w, int h) {
 	if (dowin) {
 		v4l1_window.x = 0;
 		v4l1_window.y = 0;
-		ioctl(fd, VIDIOCSWIN, &v4l1_window);
+		v4l2_ioctl(fd, VIDIOCSWIN, &v4l1_window);
 		if (w > 0) v4l1_window.width = w;
 		if (h > 0) v4l1_window.height = h;
 		fprintf(stderr, "calling V4L_1: VIDIOCSWIN\n");
 		fprintf(stderr, "trying new size %dx%d\n",
 		    v4l1_window.width, v4l1_window.height);
-		if (ioctl(fd, VIDIOCSWIN, &v4l1_window) == -1) {
+		if (v4l2_ioctl(fd, VIDIOCSWIN, &v4l1_window) == -1) {
 			perror("ioctl VIDIOCSWIN");
 			return 0;
 		}
@@ -222,13 +225,13 @@ static void v4l1_setfreq(int fd, unsigned long freq, int verb) {
 #ifdef V4L_OK
 	unsigned long f0, f1;
 	f1 = (freq * 16) / 1000;
-	ioctl(fd, VIDIOCGFREQ, &f0);
+	v4l2_ioctl(fd, VIDIOCGFREQ, &f0);
 	if (verb) fprintf(stderr, "read freq: %d\n", (int) f0);
 	if (freq > 0) {
-		if (ioctl(fd, VIDIOCSFREQ, &f1) == -1) {
+		if (v4l2_ioctl(fd, VIDIOCSFREQ, &f1) == -1) {
 			perror("ioctl VIDIOCSFREQ");
 		} else {
-			ioctl(fd, VIDIOCGFREQ, &f0);
+			v4l2_ioctl(fd, VIDIOCGFREQ, &f0);
 			if (verb) fprintf(stderr, "read freq: %d\n", (int) f0);
 			last_freq = freq;
 		}
@@ -243,12 +246,12 @@ static void v4l1_set_input(int fd, int which) {
 	if (which != -1) {
 		memset(&v4l1_channel, 0, sizeof(v4l1_channel));
 		v4l1_channel.channel = which;
-		if (ioctl(fd, VIDIOCGCHAN, &v4l1_channel) != -1) {
+		if (v4l2_ioctl(fd, VIDIOCGCHAN, &v4l1_channel) != -1) {
 			v4l1_channel.channel = which;
 			fprintf(stderr, "setting input channel to %d: %s\n",
 			    which, v4l1_channel.name);
 			last_channel = which;
-			ioctl(fd, VIDIOCSCHAN, &v4l1_channel);
+			v4l2_ioctl(fd, VIDIOCSCHAN, &v4l1_channel);
 		}
 	}
 #else
@@ -267,7 +270,7 @@ static int v4l1_setfmt(int fd, char *fmt) {
 		v4l1_picture.palette = fnew;
 	}
 	fprintf(stderr, "calling V4L_1: VIDIOCSPICT\n");
-	if (ioctl(fd, VIDIOCSPICT, &v4l1_picture) == -1) {
+	if (v4l2_ioctl(fd, VIDIOCSPICT, &v4l1_picture) == -1) {
 		perror("ioctl VIDIOCSPICT");
 		return 0;
 	}
@@ -352,7 +355,7 @@ static void apply_settings(char *dev, char *settings, int *fd) {
 		if (cn >= 0) v4l1_picture.contrast   = v4l1_val(cn);
 
 		fprintf(stderr, "calling V4L_1: VIDIOCSPICT\n");
-		if (ioctl(*fd, VIDIOCSPICT, &v4l1_picture) == -1) {
+		if (v4l2_ioctl(*fd, VIDIOCSPICT, &v4l1_picture) == -1) {
 			perror("ioctl VIDIOCSPICT");
 		}
 
@@ -388,7 +391,7 @@ static void apply_settings(char *dev, char *settings, int *fd) {
 				for (i=0; i< v4l1_capability.channels; i++) {
 					memset(&v4l1_channel, 0, sizeof(v4l1_channel));
 					v4l1_channel.channel = i;
-					if (ioctl(*fd, VIDIOCGCHAN, &v4l1_channel) == -1) {
+					if (v4l2_ioctl(*fd, VIDIOCGCHAN, &v4l1_channel) == -1) {
 						continue;
 					}
 					if (! v4l1_channel.tuners) {
@@ -398,7 +401,7 @@ static void apply_settings(char *dev, char *settings, int *fd) {
 						continue;
 					}
 					v4l1_channel.norm = mode;
-					ioctl(*fd, VIDIOCSCHAN, &v4l1_channel);
+					v4l2_ioctl(*fd, VIDIOCSCHAN, &v4l1_channel);
 				}
 			}
 		}
@@ -414,7 +417,7 @@ static void apply_settings(char *dev, char *settings, int *fd) {
 				for (i=0; i< v4l1_capability.channels; i++) {
 					memset(&v4l1_channel, 0, sizeof(v4l1_channel));
 					v4l1_channel.channel = i;
-					if (ioctl(*fd, VIDIOCGCHAN, &v4l1_channel) == -1) {
+					if (v4l2_ioctl(*fd, VIDIOCGCHAN, &v4l1_channel) == -1) {
 						continue;
 					}
 					if (!strcmp(v4l1_channel.name, inp)) {
@@ -473,7 +476,7 @@ static void v4l_br(int b) {
 	int old = v4l1_picture.brightness;
 
 	v4l1_picture.brightness = v4l1_dpct(old, b);
-	ioctl(raw_fb_fd, VIDIOCSPICT, &v4l1_picture);
+	v4l2_ioctl(raw_fb_fd, VIDIOCSPICT, &v4l1_picture);
 	v4l_requery();
 #else
 	if (!b) {}
@@ -485,7 +488,7 @@ static void v4l_hu(int b) {
 	int old = v4l1_picture.hue;
 
 	v4l1_picture.hue = v4l1_dpct(old, b);
-	ioctl(raw_fb_fd, VIDIOCSPICT, &v4l1_picture);
+	v4l2_ioctl(raw_fb_fd, VIDIOCSPICT, &v4l1_picture);
 	v4l_requery();
 #else
 	if (!b) {}
@@ -497,7 +500,7 @@ static void v4l_co(int b) {
 	int old = v4l1_picture.colour;
 
 	v4l1_picture.colour = v4l1_dpct(old, b);
-	ioctl(raw_fb_fd, VIDIOCSPICT, &v4l1_picture);
+	v4l2_ioctl(raw_fb_fd, VIDIOCSPICT, &v4l1_picture);
 	v4l_requery();
 #else
 	if (!b) {}
@@ -509,7 +512,7 @@ static void v4l_cn(int b) {
 	int old = v4l1_picture.contrast;
 
 	v4l1_picture.contrast = v4l1_dpct(old, b);
-	ioctl(raw_fb_fd, VIDIOCSPICT, &v4l1_picture);
+	v4l2_ioctl(raw_fb_fd, VIDIOCSPICT, &v4l1_picture);
 	v4l_requery();
 #else
 	if (!b) {}
@@ -902,7 +905,7 @@ static int v4l1_query(int fd, int v) {
 
 	if (v) fprintf(stderr, "\nV4L_1 query:\n");
 #ifdef VIDIOCGCAP
-	if (ioctl(fd, VIDIOCGCAP, &v4l1_capability) == -1) {
+	if (v4l2_ioctl(fd, VIDIOCGCAP, &v4l1_capability) == -1) {
 		perror("ioctl VIDIOCGCAP");
 		fprintf(stderr, "\n");
 		return 0;
@@ -923,7 +926,7 @@ static int v4l1_query(int fd, int v) {
 		char *type = "unknown";
 		memset(&v4l1_channel, 0, sizeof(v4l1_channel));
 		v4l1_channel.channel = i;
-		if (ioctl(fd, VIDIOCGCHAN, &v4l1_channel) == -1) {
+		if (v4l2_ioctl(fd, VIDIOCGCHAN, &v4l1_channel) == -1) {
 			perror("ioctl VIDIOCGCHAN");
 			continue;
 		}
@@ -938,7 +941,7 @@ static int v4l1_query(int fd, int v) {
 	}
 
 	memset(&v4l1_tuner, 0, sizeof(v4l1_tuner));
-	if (ioctl(fd, VIDIOCGTUNER, &v4l1_tuner) != -1) {
+	if (v4l2_ioctl(fd, VIDIOCGTUNER, &v4l1_tuner) != -1) {
 		char *mode = "unknown";
 		if (v4l1_tuner.mode == VIDEO_MODE_PAL) {
 			mode = "PAL";
@@ -955,7 +958,7 @@ static int v4l1_query(int fd, int v) {
 		
 	}
 
-	if (ioctl(fd, VIDIOCGPICT, &v4l1_picture) == -1) {
+	if (v4l2_ioctl(fd, VIDIOCGPICT, &v4l1_picture) == -1) {
 		perror("ioctl VIDIOCGCHAN");
 		return 0;
 	}
@@ -969,7 +972,7 @@ static int v4l1_query(int fd, int v) {
 	if (v) fprintf(stderr, "     palette:     %d  %s\n", v4l1_picture.palette,
 	    v4l1_lu_palette(v4l1_picture.palette));
 	
-	if (ioctl(fd, VIDIOCGWIN, &v4l1_window) == -1) {
+	if (v4l2_ioctl(fd, VIDIOCGWIN, &v4l1_window) == -1) {
 		perror("ioctl VIDIOCGWIN");
 		if (v) fprintf(stderr, "\n");
 		return 0;
@@ -1001,7 +1004,7 @@ static int v4l2_query(int fd, int v) {
 
 	if (v) fprintf(stderr, "\nV4L_2 query:\n");
 #ifdef VIDIOC_QUERYCAP
-	if (ioctl(fd, VIDIOC_QUERYCAP, &v4l2_capability) == -1) {
+	if (v4l2_ioctl(fd, VIDIOC_QUERYCAP, &v4l2_capability) == -1) {
 		perror("ioctl VIDIOC_QUERYCAP");
 		if (v) fprintf(stderr, "\n");
 		return 0;
@@ -1020,7 +1023,7 @@ static int v4l2_query(int fd, int v) {
 	for (i=0; ; i++) {
 		memset(&v4l2_input, 0, sizeof(v4l2_input));
 		v4l2_input.index = i;
-		if (ioctl(fd, VIDIOC_ENUMINPUT, &v4l2_input) == -1) {
+		if (v4l2_ioctl(fd, VIDIOC_ENUMINPUT, &v4l2_input) == -1) {
 			break;
 		}
 		if (v) fprintf(stderr, "    input[%d]: %s\ttype: %d tuner: %d\n",
@@ -1030,7 +1033,7 @@ static int v4l2_query(int fd, int v) {
 		for (i=0; ; i++) {
 			memset(&v4l2_tuner, 0, sizeof(v4l2_tuner));
 			v4l2_tuner.index = i;
-			if (ioctl(fd, VIDIOC_G_TUNER, &v4l2_tuner) == -1) {
+			if (v4l2_ioctl(fd, VIDIOC_G_TUNER, &v4l2_tuner) == -1) {
 				break;
 			}
 			if (v) fprintf(stderr, "    tuner[%d]: %s\ttype: %d\n",
@@ -1043,7 +1046,7 @@ static int v4l2_query(int fd, int v) {
 			v4l2_fmtdesc.index = i;
 			v4l2_fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 			
-			if (ioctl(fd, VIDIOC_ENUM_FMT, &v4l2_fmtdesc) == -1) {
+			if (v4l2_ioctl(fd, VIDIOC_ENUM_FMT, &v4l2_fmtdesc) == -1) {
 				break;
 			}
 			if (v) fprintf(stderr, "    fmtdesc[%d]: %s\ttype: %d"
@@ -1052,7 +1055,7 @@ static int v4l2_query(int fd, int v) {
 			    v4l2_fmtdesc.pixelformat);
 		}
 		v4l2_format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-		if (ioctl(fd, VIDIOC_G_FMT, &v4l2_format) == -1) {
+		if (v4l2_ioctl(fd, VIDIOC_G_FMT, &v4l2_format) == -1) {
 			perror("ioctl VIDIOC_G_FMT");
 		} else {
 			if (v) fprintf(stderr, "    width:  %d\n", v4l2_format.fmt.pix.width);
@@ -1076,17 +1079,36 @@ static int open_dev(char *dev) {
 	if (! dev) {
 		return dfd;
 	}
-	dfd = open(dev, O_RDWR);
+	dfd = v4l2_open(dev, O_RDWR);
 	if (dfd < 0) {
 		rfbLog("failed to rawfb file: %s O_RDWR\n", dev);
 		rfbLogPerror("open");
-		dfd = open(dev, O_RDONLY);
+		dfd = v4l2_open(dev, O_RDONLY);
 	}
 	if (dfd < 0) {
 		rfbLog("failed to rawfb file: %s\n", dev);
 		rfbLog("failed to rawfb file: %s O_RDONLY\n", dev);
 		rfbLogPerror("open");
 	}
+
+
+	{
+		struct v4l2_format fmt;
+		memset ( &fmt, 0, sizeof ( fmt ) );
+		fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+		fmt.fmt.pix.width = 1920;
+		fmt.fmt.pix.height = 1080;
+		fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_BGR24;
+		if (v4l2_ioctl(dfd, VIDIOC_S_FMT, &fmt) == -1) {
+			perror("*** VIDIOC_S_FMT");
+		} else {
+			fprintf(stderr, "*** %dx%d %u %s\n",
+				fmt.fmt.pix.width, fmt.fmt.pix.height,
+				fmt.fmt.pix.pixelformat,
+				v4l2_lu_palette(fmt.fmt.pix.pixelformat));
+		}
+	}
+
 	return dfd;
 }
 
@@ -1160,7 +1182,7 @@ if (0) fprintf(stderr, "v4l1: %d %d %d\n", g_w, g_h, g_d);
 	}
 
 	/* failure */
-	close(dfd);
+	v4l2_close(dfd);
 	return NULL;
 #else
 	if (!dev || !fd) {}
@@ -1391,7 +1413,7 @@ char *v4l_guess(char *str, int *fd) {
 	if (atparms == NULL) {
 		/* bad news */
 		if (*fd >= 0) {
-			close(*fd);
+			v4l2_close(*fd);
 		}
 		*fd = -1;
 		return NULL;

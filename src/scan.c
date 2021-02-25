@@ -2674,6 +2674,8 @@ static void snap_vcsa_rawfb(void) {
 	prev_ypos = ypos;
 }
 
+#include <libv4l2.h>
+
 static void snap_all_rawfb(void) {
 	int pixelsize = bpp/8;
 	int n, sz;
@@ -2709,7 +2711,7 @@ static void snap_all_rawfb(void) {
 
 		lseek(raw_fb_fd, off, SEEK_SET);
 		while (len > 0) {
-			n = read(raw_fb_fd, dst + del, len);
+			n = v4l2_read(raw_fb_fd, dst + del, len);
 			if (n > 0) {
 				del += n;
 				len -= n;
